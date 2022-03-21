@@ -31,7 +31,7 @@ fs.readFile('file.mod', function(err, data) {
 ## Supported formats
 Basically all the formats supported by libopenmpt, here is the list:
 
-`mod s3m xm it mptm stm nst m15 stk wow ult 669 mtm med far mdl ams dsm amf okt dmf ptm psm mt2 dbm digi imf j2b gdm umx plm mo3 xpk ppm mmcmp`
+`mod s3m xm it mptm stm nst m15 stk wow ult 669 mtm med far mdl ams dsm amf okt dmf ptm psm mt2 dbm digi imf j2b gdm umx plm mo3 xpk ppm mmcmp SymMOD`
 
 ## Thanks to
 
