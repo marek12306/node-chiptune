@@ -13,7 +13,7 @@ module.exports = function(buffer, options) {
 
     const samplerate = options['sampleRate'] || 48000;
     const channels = options['channels'] || 2;
-    const maxFramesPerChunk = options['readSize'] || 1024;
+    const maxFramesPerChunk = options['readSize'] || 16384;
 
     if(channels != 1 && channels != 2 && channels != 4) {
         throw new Error('Invalid number of channels');
@@ -37,7 +37,6 @@ function createDuplexStream(samplerate, channels, maxFramesPerChunk, bytesPerFra
     var data = [];
     var superPipe = duplex.pipe;
     var toPipe = [];
-    var destroyed = false;
 
     // Once it finishes writing, lets decode the music
     duplex.once('finish', function() {
@@ -57,7 +56,11 @@ function createDuplexStream(samplerate, channels, maxFramesPerChunk, bytesPerFra
     });
 
     duplex._write = function(chunk, enc, next) {
-        data.push(chunk);
+        if(Buffer.isBuffer(chunk)) {
+            data.push(chunk);
+        } else {
+            data.push(Buffer.from(chunk));
+        }
         next();
     };
 
@@ -68,14 +71,10 @@ function createDuplexStream(samplerate, channels, maxFramesPerChunk, bytesPerFra
                 cleanupModule(mod_ptr, buf_ptr);
                 mod_ptr = null;
                 buf_ptr = null;
-                destroyed = true;
             }
             duplex.push(buf);
-        } else if(destroyed) {
-            duplex.push(null);
-            duplex.emit('end');
         } else {
-            duplex.push(null);
+            duplex.push(Buffer.from(m).fill(0));
         }
     };
 
@@ -88,14 +87,6 @@ function createDuplexStream(samplerate, channels, maxFramesPerChunk, bytesPerFra
         }
     };
 
-    duplex.destroy = function() {
-        duplex.end();
-        destroyed = true;
-        cleanupModule(mod_ptr, buf_ptr);
-        mod_ptr = null;
-        buf_ptr = null;
-    };
-
     createProperties(duplex, mod_ptr);
 
     return duplex;
@@ -106,24 +97,13 @@ function createReadableStream(buffer, samplerate, channels, maxFramesPerChunk, b
 
     const mod_ptr = initModule(buffer);
     const buf_ptr = initBuffer(maxFramesPerChunk, bytesPerFrame);
-    var destroyed = false;
 
     readable._read = function() {
-        if(destroyed) {
-            readable.push(null);
-            return;
-        }
         const buf = readModule(mod_ptr, buf_ptr, samplerate, channels, maxFramesPerChunk, bytesPerFrame);
         if(buf == null) {
             cleanupModule(mod_ptr, buf_ptr);
-            destroyed = true;
         }
         readable.push(buf);
-    };
-
-    readable.destroy = function() {
-        destroyed = true;
-        cleanupModule(mod_ptr, buf_ptr);
     };
 
     createProperties(readable, mod_ptr);
@@ -161,7 +141,7 @@ function readModule(mod_ptr, buf_ptr, samplerate, channels, maxFramesPerChunk, b
 
     var rawpcm = native.HEAPU8.subarray(buf_ptr, buf_ptr + bytesPerFrame * frames);
 
-    return new Buffer(rawpcm.buffer).slice(rawpcm.byteOffset, rawpcm.byteOffset + rawpcm.byteLength);
+    return Buffer.from(rawpcm.buffer).slice(rawpcm.byteOffset, rawpcm.byteOffset + rawpcm.byteLength);
 }
 
 function cleanupModule(mod_ptr, buf_ptr) {
